@@ -20,6 +20,7 @@ app.use(cors({ origin: 'http://localhost:5173' }));
 
 // ─── Middleware ───
 app.use(express.json());
+app.get('/health', (_, res) => res.status(200).json({ status: 'ok' }));
 app.use('/uploads', express.static(process.env.UPLOAD_DIR || 'uploads'));
 
 // Crear carpeta uploads si no existe

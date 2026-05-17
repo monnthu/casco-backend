@@ -16,7 +16,7 @@ const io     = new Server(server, {
 });
 
 const cors = require('cors');
-app.use(cors({ origin: '*' }));
+app.use(cors({ origin: 'https://casco-web.vercel.app' }));
 
 // ─── Middleware ───
 app.use(express.json());

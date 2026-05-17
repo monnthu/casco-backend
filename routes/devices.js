@@ -3,20 +3,59 @@ const pool    = require('../db');
 const { verifyJWT, verifyDevice } = require('./middleware');
 const router  = express.Router();
 
-// POST /devices/register  (usuario autenticado registra un casco)
-router.post('/register', verifyJWT, async (req, res) => {
-    const { device_id, api_token } = req.body;
-    if (!device_id || !api_token)
-        return res.status(400).json({ error: 'Faltan campos' });
+// POST /devices/link  (usuario vincula dispositivo a su cuenta)
+router.post('/link', verifyJWT, async (req, res) => {
+    const { device_id } = req.body;
+    if (!device_id) return res.status(400).json({ error: 'Falta device_id' });
 
     try {
-        await pool.query(
-            `INSERT INTO devices (device_id, owner_id, api_token)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (device_id) DO UPDATE SET api_token = $3`,
-            [device_id, req.user.id, api_token]
+        const existing = await pool.query(
+            'SELECT * FROM devices WHERE device_id = $1', [device_id]
         );
-        res.status(201).json({ ok: true });
+
+        if (existing.rows.length === 0)
+            return res.status(404).json({ error: 'Device ID no encontrado' });
+
+        await pool.query(
+            'UPDATE devices SET owner_id = $1 WHERE device_id = $2',
+            [req.user.id, device_id]
+        );
+
+        res.status(200).json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /devices/auto-register  (el casco se registra solo)
+router.post('/auto-register', async (req, res) => {
+    const { device_id } = req.body;
+    if (!device_id) return res.status(400).json({ error: 'Falta device_id' });
+
+    try {
+        // Verificar si ya existe
+        const existing = await pool.query(
+            'SELECT * FROM devices WHERE device_id = $1', [device_id]
+        );
+
+        if (existing.rows.length > 0) {
+            // Ya existe — devolver token existente
+            return res.status(200).json({
+                api_token: existing.rows[0].api_token
+            });
+        }
+
+        // Generar API token automático
+        const crypto = require('crypto');
+        const api_token = crypto.randomBytes(24).toString('hex');
+
+        await pool.query(
+            `INSERT INTO devices (device_id, api_token)
+             VALUES ($1, $2)`,
+            [device_id, api_token]
+        );
+
+        res.status(201).json({ api_token });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

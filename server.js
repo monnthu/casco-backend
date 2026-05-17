@@ -16,7 +16,7 @@ const io     = new Server(server, {
 });
 
 const cors = require('cors');
-app.use(cors({ origin: 'http://localhost:5173' }));
+app.use(cors({ origin: '*' }));
 
 // ─── Middleware ───
 app.use(express.json());

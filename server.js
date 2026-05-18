@@ -9,6 +9,8 @@ const authRoutes    = require('./routes/auth');
 const deviceRoutes  = require('./routes/devices');
 const eventRoutes   = require('./routes/events');
 
+const http = require('http');
+
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, {
@@ -44,6 +46,17 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log(`[WS] Cliente desconectado: ${socket.id}`);
     });
+});
+
+app.get('/stream/:deviceId', verifyJWT, (req, res) => {
+    const camIp = req.query.ip;
+    if (!camIp) return res.status(400).end();
+
+    http.get(`http://${camIp}/stream`, camRes => {
+        res.set('Content-Type', camRes.headers['content-type']);
+        res.set('Cache-Control', 'no-cache');
+        camRes.pipe(res);
+    }).on('error', () => res.status(502).end());
 });
 
 // Exponer io para usarlo en rutas

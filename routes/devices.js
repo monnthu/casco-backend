@@ -74,4 +74,17 @@ router.get('/', verifyJWT, async (req, res) => {
     }
 });
 
+router.delete('/:deviceId', verifyJWT, async (req, res) => {
+    const { deviceId } = req.params;
+    try {
+        await pool.query(
+            'UPDATE devices SET owner_id = NULL WHERE device_id = $1 AND owner_id = $2',
+            [deviceId, req.user.id]
+        );
+        res.status(200).json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;

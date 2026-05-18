@@ -136,7 +136,6 @@ module.exports = (io) => {
         });
         res.status(200).end();
     });
-});
 
     return router;
 };

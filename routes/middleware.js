@@ -62,5 +62,3 @@ async function verifyDeviceHeader(req, res, next) {
 }
 
 module.exports = { verifyJWT, verifyDevice, verifyDeviceHeader };
-
-module.exports = { verifyJWT, verifyDevice };

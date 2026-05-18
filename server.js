@@ -9,6 +9,7 @@ const { verifyJWT } = require('./routes/middleware');
 const authRoutes   = require('./routes/auth');
 const deviceRoutes = require('./routes/devices');
 const eventRoutes  = require('./routes/events');
+const { verifyDeviceHeader } = require('./routes/middleware');
 
 const app    = express();
 const server = http.createServer(app);
@@ -49,6 +50,20 @@ io.on('connection', (socket) => {
 });
 
 app.set('io', io);
+
+app.post('/stream/frame', verifyDeviceHeader, (req, res) => {
+    const device_id = req.headers['x-device-id'];
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => {
+        const imageData = Buffer.concat(chunks).toString('base64');
+        io.to(device_id).emit('frame', {
+            device_id,
+            image: `data:image/jpeg;base64,${imageData}`
+        });
+        res.status(200).end();
+    });
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

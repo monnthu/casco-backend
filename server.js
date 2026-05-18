@@ -20,10 +20,6 @@ const io = new Server(server, {
     allowEIO3: true // compatibilidad con clientes más viejos
 });
 
-app.use('/socket.io', (req, res, next) => {
-    console.log('[SOCKET.IO POLL]', req.method, req.url);
-    next();
-});
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());

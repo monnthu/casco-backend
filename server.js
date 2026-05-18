@@ -4,7 +4,7 @@ const http       = require('http');
 const { Server } = require('socket.io');
 const fs         = require('fs');
 const cors       = require('cors');
-const { verifyJWT, verifyDeviceHeader } = require('./routes/middleware');
+const { verifyJWT } = require('./routes/middleware');
 const authRoutes   = require('./routes/auth');
 const deviceRoutes = require('./routes/devices');
 const eventRoutes  = require('./routes/events');
@@ -14,43 +14,18 @@ const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors({ origin: 'https://casco-web.vercel.app' }));
-
-// /stream/frame va ANTES de express.json() para poder leer el body raw
-app.post('/stream/frame', verifyDeviceHeader, (req, res) => {
-    const device_id = req.headers['x-device-id'];
-    const chunks = [];
-    req.on('data', chunk => chunks.push(chunk));
-    req.on('end', () => {
-        const imageData = Buffer.concat(chunks).toString('base64');
-        io.to(device_id).emit('frame', {
-            device_id,
-            image: `data:image/jpeg;base64,${imageData}`
-        });
-        res.status(200).end();
-    });
-});
-
 app.use(express.json());
 app.get('/health', (_, res) => res.status(200).json({ status: 'ok' }));
-app.use('/uploads', express.static(process.env.UPLOAD_DIR || 'uploads'));
 
 const uploadDir = process.env.UPLOAD_DIR || 'uploads';
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+app.use('/uploads', express.static(uploadDir));
 
 app.use('/auth',    authRoutes);
 app.use('/devices', deviceRoutes);
 app.use('/events',  eventRoutes(io));
 
-app.get('/stream/:deviceId', verifyJWT, (req, res) => {
-    const camIp = req.query.ip;
-    if (!camIp) return res.status(400).end();
-    http.get(`http://${camIp}/stream`, camRes => {
-        res.set('Content-Type', camRes.headers['content-type']);
-        res.set('Cache-Control', 'no-cache');
-        camRes.pipe(res);
-    }).on('error', () => res.status(502).end());
-});
-
+// ── Socket.IO: clientes web ──
 io.on('connection', (socket) => {
     console.log(`[WS] Cliente conectado: ${socket.id}`);
     socket.on('join_device', (deviceId) => {
@@ -59,6 +34,56 @@ io.on('connection', (socket) => {
     });
     socket.on('disconnect', () => {
         console.log(`[WS] Cliente desconectado: ${socket.id}`);
+    });
+});
+
+// ── WebSocket nativo: stream desde ESP32 ──
+// El ESP32 se conecta a wss://backend/ws/stream/:deviceId
+// y envía frames JPEG como mensajes binarios
+const { WebSocketServer } = require('ws');
+const wss = new WebSocketServer({ noServer: true });
+
+// Map de conexiones activas: deviceId -> ws
+const camSockets = new Map();
+
+wss.on('connection', (ws, deviceId) => {
+    console.log(`[CAM-WS] ESP32 conectado: ${deviceId}`);
+    camSockets.set(deviceId, ws);
+
+    ws.on('message', (data, isBinary) => {
+        if (!isBinary) {
+            // Primer mensaje de identificación JSON — ignorar, ya tenemos deviceId
+            return;
+        }
+        // Frame JPEG binario — convertir a base64 y emitir a los clientes web
+        const b64 = data.toString('base64');
+        io.to(deviceId).emit('frame', {
+            device_id: deviceId,
+            image: `data:image/jpeg;base64,${b64}`
+        });
+    });
+
+    ws.on('close', () => {
+        console.log(`[CAM-WS] ESP32 desconectado: ${deviceId}`);
+        camSockets.delete(deviceId);
+        io.to(deviceId).emit('cam_offline', { device_id: deviceId });
+    });
+
+    ws.on('error', (err) => {
+        console.error(`[CAM-WS] Error ${deviceId}:`, err.message);
+    });
+});
+
+// Upgrade HTTP -> WebSocket solo para /ws/stream/:deviceId
+server.on('upgrade', (req, socket, head) => {
+    const match = req.url.match(/^\/ws\/stream\/(.+)$/);
+    if (!match) {
+        socket.destroy();
+        return;
+    }
+    const deviceId = match[1];
+    wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit('connection', ws, deviceId);
     });
 });
 

@@ -11,7 +11,14 @@ const eventRoutes  = require('./routes/events');
 
 const app    = express();
 const server = http.createServer(app);
-const io     = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, {
+    cors: {
+        origin: '*',
+        methods: ['GET', 'POST'],
+        credentials: false
+    },
+    allowEIO3: true // compatibilidad con clientes más viejos
+});
 
 app.use('/socket.io', (req, res, next) => {
     console.log('[SOCKET.IO POLL]', req.method, req.url);

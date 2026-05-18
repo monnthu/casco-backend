@@ -13,7 +13,7 @@ const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: '*' } });
 
-app.use(cors({ origin: 'https://casco-web.vercel.app' }));
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.get('/health', (_, res) => res.status(200).json({ status: 'ok' }));
 
@@ -78,8 +78,7 @@ wss.on('connection', (ws, deviceId) => {
 server.on('upgrade', (req, socket, head) => {
     const match = req.url.match(/^\/ws\/stream\/(.+)$/);
     if (!match) {
-        socket.destroy();
-        return;
+        return; // dejar que Socket.IO maneje su propio upgrade
     }
     const deviceId = match[1];
     wss.handleUpgrade(req, socket, head, (ws) => {

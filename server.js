@@ -37,6 +37,15 @@ app.post('/devices/:deviceId/flash', verifyJWT, (req, res) => {
     if (!cam || cam.readyState !== 1) {
         return res.status(503).json({ error: 'Camara no conectada' });
     }
+	setInterval(() => {
+		camSockets.forEach((ws, deviceId) => {
+			if (ws.readyState === 1) {
+				ws.ping();
+			} else {
+				camSockets.delete(deviceId);
+			}
+		});
+	}, 10000); // cada 10s
     cam.send(JSON.stringify({ cmd: 'flash' }));
     res.json({ ok: true });
 });

@@ -42,4 +42,25 @@ async function verifyDevice(req, res, next) {
     }
 }
 
+async function verifyDeviceHeader(req, res, next) {
+    const header    = req.headers['authorization'];
+    const device_id = req.headers['x-device-id'];
+    if (!header || !device_id) return res.status(401).json({ error: 'Sin token' });
+
+    const token = header.split(' ')[1];
+    try {
+        const result = await pool.query(
+            'SELECT * FROM devices WHERE device_id = $1 AND api_token = $2',
+            [device_id, token]
+        );
+        if (result.rows.length === 0)
+            return res.status(401).json({ error: 'No autorizado' });
+        next();
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+}
+
+module.exports = { verifyJWT, verifyDevice, verifyDeviceHeader };
+
 module.exports = { verifyJWT, verifyDevice };

@@ -2,7 +2,7 @@ const express   = require('express');
 const multer    = require('multer');
 const pool      = require('../db');
 const supabase  = require('../supabase');
-const { verifyDevice, verifyJWT } = require('./middleware');
+const { verifyDevice, verifyDeviceHeader } = require('./middleware');
 const router    = express.Router();
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -121,6 +121,22 @@ module.exports = (io) => {
             res.status(500).json({ error: err.message });
         }
     });
+	
+	// POST /stream/frame
+	router.post('/stream/frame', verifyDeviceHeader, (req, res) => {
+    const device_id = req.headers['x-device-id'];
+    const chunks = [];
+
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => {
+        const imageData = Buffer.concat(chunks).toString('base64');
+        io.to(device_id).emit('frame', {
+            device_id,
+            image: `data:image/jpeg;base64,${imageData}`
+        });
+        res.status(200).end();
+    });
+});
 
     return router;
 };

@@ -81,10 +81,9 @@ wss.on('connection', (ws, deviceId) => {
 
 // Upgrade HTTP -> WebSocket solo para /ws/stream/:deviceId
 server.on('upgrade', (req, socket, head) => {
+    if (req.url.startsWith('/socket.io')) return; // dejar que Socket.IO lo maneje
     const match = req.url.match(/^\/ws\/stream\/(.+)$/);
-    if (!match) {
-        return; // dejar que Socket.IO maneje su propio upgrade
-    }
+    if (!match) return;
     const deviceId = match[1];
     wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit('connection', ws, deviceId);

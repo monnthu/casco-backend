@@ -29,6 +29,18 @@ app.use('/auth',    authRoutes);
 app.use('/devices', deviceRoutes);
 app.use('/events',  eventRoutes(io));
 
+// ── Flash toggle ──
+const { verifyJWT } = require('./routes/middleware');
+app.post('/devices/:deviceId/flash', verifyJWT, (req, res) => {
+    const { deviceId } = req.params;
+    const cam = camSockets.get(deviceId);
+    if (!cam || cam.readyState !== 1) {
+        return res.status(503).json({ error: 'Camara no conectada' });
+    }
+    cam.send(JSON.stringify({ cmd: 'flash' }));
+    res.json({ ok: true });
+});
+
 // ── Socket.IO: clientes web ──
 io.on('connection', (socket) => {
     console.log(`[WS] Cliente conectado: ${socket.id}`);

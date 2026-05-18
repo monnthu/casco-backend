@@ -4,20 +4,33 @@ const http       = require('http');
 const { Server } = require('socket.io');
 const fs         = require('fs');
 const cors       = require('cors');
-const { verifyJWT } = require('./routes/middleware');
-
+const { verifyJWT, verifyDeviceHeader } = require('./routes/middleware');
 const authRoutes   = require('./routes/auth');
 const deviceRoutes = require('./routes/devices');
 const eventRoutes  = require('./routes/events');
-const { verifyDeviceHeader } = require('./routes/middleware');
 
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors({ origin: 'https://casco-web.vercel.app' }));
-app.use(express.json());
 
+// /stream/frame va ANTES de express.json() para poder leer el body raw
+app.post('/stream/frame', verifyDeviceHeader, (req, res) => {
+    const device_id = req.headers['x-device-id'];
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => {
+        const imageData = Buffer.concat(chunks).toString('base64');
+        io.to(device_id).emit('frame', {
+            device_id,
+            image: `data:image/jpeg;base64,${imageData}`
+        });
+        res.status(200).end();
+    });
+});
+
+app.use(express.json());
 app.get('/health', (_, res) => res.status(200).json({ status: 'ok' }));
 app.use('/uploads', express.static(process.env.UPLOAD_DIR || 'uploads'));
 
@@ -50,20 +63,6 @@ io.on('connection', (socket) => {
 });
 
 app.set('io', io);
-
-app.post('/stream/frame', verifyDeviceHeader, (req, res) => {
-    const device_id = req.headers['x-device-id'];
-    const chunks = [];
-    req.on('data', chunk => chunks.push(chunk));
-    req.on('end', () => {
-        const imageData = Buffer.concat(chunks).toString('base64');
-        io.to(device_id).emit('frame', {
-            device_id,
-            image: `data:image/jpeg;base64,${imageData}`
-        });
-        res.status(200).end();
-    });
-});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

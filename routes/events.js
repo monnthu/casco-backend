@@ -2,7 +2,7 @@ const express   = require('express');
 const multer    = require('multer');
 const pool      = require('../db');
 const supabase  = require('../supabase');
-const { verifyDevice, verifyDeviceHeader } = require('./middleware');
+const { verifyDevice, verifyDeviceHeader, verifyJWT } = require('./middleware');
 const router    = express.Router();
 
 const upload = multer({ storage: multer.memoryStorage() });

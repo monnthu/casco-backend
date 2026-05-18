@@ -13,8 +13,8 @@ const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: '*' } });
 
-app.use((req, res, next) => {
-    console.log(`[HTTP] ${req.method} ${req.url}`);
+app.use('/socket.io', (req, res, next) => {
+    console.log('[SOCKET.IO POLL]', req.method, req.url);
     next();
 });
 
